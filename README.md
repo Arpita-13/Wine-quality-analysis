@@ -57,6 +57,3 @@ Build and deploy an interactive web application that demonstrates **6 different 
 | **Random Forest** | **Best overall performer** with highest scores across all metrics. Ensemble approach reduces overfitting and captures complex feature interactions effectively. |
 | **XGBoost** | Excellent performance comparable to Random Forest. Slightly better precision (81%) but lower recall (72%). Great for imbalanced datasets. |
 
-## d. Technical Implementation
-
-### Project Structure
