@@ -63,7 +63,7 @@ st.markdown("""
         color: white;
     }
     .info-box {
-        background-color: #f8f9fa;
+        background-color: #EFF6FF ;
         border-radius: 10px;
         padding: 1rem;
         border: 1px solid #dee2e6;
@@ -842,3 +842,4 @@ if 'page' in st.session_state:
         option = "Predict"
     elif st.session_state.page == "Model Comparison":
         option = "Model Comparison"
+
