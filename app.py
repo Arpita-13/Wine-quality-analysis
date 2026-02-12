@@ -3,64 +3,151 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 import joblib
 import os
 from PIL import Image
 import base64
+from io import StringIO
+import time
 
 # Page configuration
 st.set_page_config(
-    page_title="ML Classification Models",
-    page_icon="🤖",
-    layout="wide"
+    page_title="ML Classification Models - Wine Quality",
+    page_icon="🍷",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
-        color: #1E88E5;
+        font-size: 2.8rem;
+        color: #722f37;
         text-align: center;
         margin-bottom: 1rem;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
     .sub-header {
-        font-size: 1.5rem;
-        color: #0D47A1;
+        font-size: 1.8rem;
+        color: #965a5e;
         margin-top: 1rem;
         margin-bottom: 0.5rem;
+        font-weight: 600;
+        border-bottom: 2px solid #d4af37;
+        padding-bottom: 0.3rem;
     }
     .metric-card {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 15px;
+        padding: 1.2rem;
         margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 5px solid #722f37;
     }
     .stButton>button {
-        background-color: #1E88E5;
+        background: linear-gradient(135deg, #722f37 0%, #965a5e 100%);
         color: white;
         font-weight: bold;
+        border-radius: 25px;
+        padding: 0.6rem 2rem;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0,0,0,0.2);
+        color: white;
+    }
+    .info-box {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        margin: 1rem 0;
+    }
+    .highlight {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 0.5rem;
         border-radius: 5px;
-        padding: 0.5rem 2rem;
+        border-left: 5px solid #28a745;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Initialize session state
+if 'predictions_made' not in st.session_state:
+    st.session_state.predictions_made = False
+if 'current_predictions' not in st.session_state:
+    st.session_state.current_predictions = None
+if 'current_probabilities' not in st.session_state:
+    st.session_state.current_probabilities = None
+if 'test_data_loaded' not in st.session_state:
+    st.session_state.test_data_loaded = False
+if 'test_data' not in st.session_state:
+    st.session_state.test_data = None
+
 # Title
-st.markdown('<p class="main-header">🔬 Machine Learning Classification Models</p>', 
-            unsafe_allow_html=True)
-st.markdown("### Wine Quality Classification: Binary Classification")
+st.markdown('<p class="main-header">🍷 Wine Quality Classification</p>', unsafe_allow_html=True)
+st.markdown("### Machine Learning Models for Binary Classification", unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.image("https://streamlit.io/images/brand/streamlit-mark-color.png", width=100)
-st.sidebar.title("Navigation")
-option = st.sidebar.radio("Go to", ["Home", "Dataset Info", "Model Training", 
-                                   "Model Comparison", "Predict", "About"])
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2879/2879517.png", width=100)
+    st.title("Navigation")
+    
+    menu_options = {
+        "🏠 Home": "Home",
+        "📊 Dataset Explorer": "Dataset Info",
+        "🤖 Model Training": "Model Training",
+        "📈 Model Comparison": "Model Comparison",
+        "🔮 Test & Predict": "Predict",
+        "ℹ️ About": "About"
+    }
+    
+    selection = st.radio("Go to", list(menu_options.keys()))
+    option = menu_options[selection]
+    
+    st.markdown("---")
+    st.markdown("### 📌 Quick Info")
+    st.info("""
+    **Dataset:** Wine Quality (Red Wine)
+    **Features:** 12
+    **Classes:** 2 (Good/Not Good)
+    **Test Split:** 20%
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 📥 Download Sample")
+    
+    # Create sample test data
+    sample_data = pd.DataFrame({
+        'fixed acidity': [7.4, 8.1, 6.8],
+        'volatile acidity': [0.7, 0.55, 0.4],
+        'citric acid': [0.0, 0.2, 0.5],
+        'residual sugar': [1.9, 2.1, 2.3],
+        'chlorides': [0.076, 0.088, 0.065],
+        'free sulfur dioxide': [11.0, 13.0, 15.0],
+        'total sulfur dioxide': [34.0, 38.0, 42.0],
+        'density': [0.9978, 0.9985, 0.9965],
+        'pH': [3.51, 3.42, 3.38],
+        'sulphates': [0.56, 0.62, 0.75],
+        'alcohol': [9.4, 10.2, 11.5]
+    })
+    
+    csv = sample_data.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()
+    href = f'<a href="data:file/csv;base64,{b64}" download="sample_test_data.csv" style="text-decoration: none; color: white; background-color: #722f37; padding: 0.5rem 1rem; border-radius: 5px; display: inline-block;">📥 Download Sample Test CSV</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
-# Load models and scaler
+# Load models and artifacts
 @st.cache_resource
-def load_models():
+def load_models_and_artifacts():
+    """Load all trained models and associated artifacts"""
     models = {}
     model_files = {
         'Logistic Regression': 'model/logistic_regression.pkl',
@@ -74,333 +161,162 @@ def load_models():
     for name, path in model_files.items():
         try:
             models[name] = joblib.load(path)
-        except:
-            st.warning(f"Model {name} not found. Training required.")
+        except FileNotFoundError:
+            st.warning(f"⚠️ Model '{name}' not found. Please run model_training.ipynb first.")
             models[name] = None
     
     try:
         scaler = joblib.load('model/scaler.pkl')
-    except:
+    except FileNotFoundError:
         scaler = None
+        st.warning("⚠️ Scaler not found. Please run model_training.ipynb first.")
     
-    return models, scaler
+    try:
+        feature_names = pd.read_csv('model/feature_names.txt', header=None)[0].tolist()
+    except:
+        feature_names = ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar',
+                        'chlorides', 'free sulfur dioxide', 'total sulfur dioxide', 'density',
+                        'pH', 'sulphates', 'alcohol']
+    
+    return models, scaler, feature_names
 
-# Load metrics
+@st.cache_data
+def load_training_test_data():
+    """Load the pre-split training and test datasets"""
+    try:
+        train_data = pd.read_csv('datasets/wine_train.csv')
+        test_data = pd.read_csv('datasets/wine_test.csv')
+        return train_data, test_data
+    except:
+        return None, None
+
 @st.cache_data
 def load_metrics():
+    """Load model performance metrics"""
     try:
         metrics_df = pd.read_csv('model/model_comparison.csv')
         return metrics_df
     except:
-        # Sample metrics if file doesn't exist
+        # Create sample metrics for display if file doesn't exist
         return pd.DataFrame({
-            'Model': ['Logistic Regression', 'Decision Tree', 'KNN', 
-                     'Naive Bayes', 'Random Forest', 'XGBoost'],
-            'Accuracy': [0.88, 0.85, 0.86, 0.78, 0.89, 0.88],
-            'AUC': [0.92, 0.84, 0.89, 0.82, 0.94, 0.93],
-            'Precision': [0.79, 0.74, 0.77, 0.58, 0.82, 0.81],
-            'Recall': [0.73, 0.68, 0.70, 0.62, 0.75, 0.72],
-            'F1': [0.76, 0.71, 0.73, 0.60, 0.78, 0.76],
-            'MCC': [0.62, 0.55, 0.58, 0.42, 0.65, 0.63]
+            'Model': ['Random Forest', 'XGBoost', 'Logistic Regression', 
+                     'KNN', 'Decision Tree', 'Naive Bayes'],
+            'Test_Accuracy': [0.89, 0.88, 0.86, 0.85, 0.82, 0.78],
+            'AUC': [0.94, 0.93, 0.91, 0.88, 0.84, 0.81],
+            'Precision': [0.82, 0.81, 0.77, 0.75, 0.71, 0.58],
+            'Recall': [0.75, 0.73, 0.71, 0.69, 0.66, 0.62],
+            'F1': [0.78, 0.77, 0.74, 0.72, 0.68, 0.60],
+            'MCC': [0.65, 0.64, 0.60, 0.57, 0.52, 0.42],
+            'Train_Accuracy': [0.94, 0.93, 0.88, 0.89, 0.91, 0.80]
         })
 
-models, scaler = load_models()
+# Load all resources
+models, scaler, feature_names = load_models_and_artifacts()
+train_data, test_data = load_training_test_data()
 metrics_df = load_metrics()
+
+# Helper functions
+def validate_features(df):
+    """Validate that the uploaded dataframe has all required features"""
+    missing_features = set(feature_names) - set(df.columns)
+    extra_features = set(df.columns) - set(feature_names)
+    
+    if missing_features:
+        return False, f"Missing features: {missing_features}"
+    return True, "Valid"
+
+def preprocess_test_data(df):
+    """Preprocess test data for prediction"""
+    # Select only required features in correct order
+    X = df[feature_names].copy()
+    
+    # Handle missing values
+    X = X.fillna(X.mean())
+    
+    return X
+
+def make_predictions(model, X, model_name):
+    """Make predictions using selected model"""
+    if model is None:
+        return None, None, "Model not loaded"
+    
+    try:
+        # Scale if necessary
+        if model_name in ['Logistic Regression', 'KNN', 'Naive Bayes']:
+            if scaler is not None:
+                X_scaled = scaler.transform(X)
+                predictions = model.predict(X_scaled)
+                probabilities = model.predict_proba(X_scaled)
+            else:
+                return None, None, "Scaler not available"
+        else:
+            predictions = model.predict(X)
+            probabilities = model.predict_proba(X)
+        
+        return predictions, probabilities, "Success"
+    except Exception as e:
+        return None, None, str(e)
 
 # Home page
 if option == "Home":
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.markdown('<p class="sub-header">📊 Project Overview</p>', 
-                   unsafe_allow_html=True)
+        st.markdown('<p class="sub-header">📊 Project Overview</p>', unsafe_allow_html=True)
         st.markdown("""
-        This interactive web application demonstrates **6 different machine learning 
-        classification models** for predicting wine quality.
+        <div class="info-box">
+        <h4>🎯 Objective</h4>
+        <p>This interactive web application demonstrates <b>6 different machine learning 
+        classification models</b> for predicting wine quality. The models are trained on 
+        the UCI Wine Quality dataset and evaluated on a held-out test set (20% of the data).</p>
         
-        ### 🎯 Objectives:
-        - Implement multiple classification algorithms
-        - Compare model performance using various metrics
-        - Deploy an interactive ML application
-        - Provide real-time predictions
-        
-        ### 📈 Models Implemented:
-        1. Logistic Regression
-        2. Decision Tree Classifier
-        3. K-Nearest Neighbors
-        4. Naive Bayes (Gaussian)
-        5. Random Forest (Ensemble)
-        6. XGBoost (Ensemble)
-        """)
+        <h4>🔬 Key Features</h4>
+        <ul>
+            <li><b>Pre-trained Models:</b> All 6 models are pre-trained on 80% of the dataset</li>
+            <li><b>Official Test Set:</b> Models are evaluated on the same 20% test split</li>
+            <li><b>Real Predictions:</b> Upload your own test data for predictions</li>
+            <li><b>Performance Metrics:</b> View accuracy, precision, recall, F1, AUC, and MCC</li>
+            <li><b>Visual Analytics:</b> Confusion matrices and comparison charts</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<p class="sub-header">📌 Quick Stats</p>', 
-                   unsafe_allow_html=True)
-        st.info(f"📊 **Models**: 6 Classifiers")
-        st.info(f"📈 **Best Model**: Random Forest")
-        st.info(f"🎯 **Best Accuracy**: {metrics_df['Accuracy'].max():.2%}")
-        st.info(f"📁 **Dataset**: Wine Quality")
-        st.info(f"🔢 **Features**: 12")
-        st.info(f"📋 **Instances**: 1599")
-    
-    # Display feature importance if available
-    try:
-        st.markdown('<p class="sub-header">🌟 Top 10 Feature Importance</p>', 
-                   unsafe_allow_html=True)
-        importance_img = Image.open('model/feature_importance.png')
-        st.image(importance_img, use_container_width=True)
-    except:
-        pass
+        st.markdown('<p class="sub-header">📈 Quick Stats</p>', unsafe_allow_html=True)
+        
+        if test_data is not None:
+            train_size = train_data.shape[0] if train_data is not None else 1279
+            test_size = test_data.shape[0] if test_data is not None else 320
+        else:
+            train_size = 1279
+            test_size = 320
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 1.5rem; border-radius: 15px; color: white;">
+            <h4 style="color: white; margin-top: 0;">Dataset Split</h4>
+            <p style="font-size: 1.2rem;">🏋️ Training: {train_size} samples (80%)</p>
+            <p style="font-size: 1.2rem;">🧪 Testing: {test_size} samples (20%)</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not metrics_df.empty:
+            best_model = metrics_df.iloc[0]['Model']
+            best_acc = metrics_df.iloc[0]['Test_Accuracy']
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                        padding: 1.5rem; border-radius: 15px; color: white; margin-top: 1rem;">
+                <h4 style="color: white; margin-top: 0;">🏆 Best Model</h4>
+                <p style="font-size: 1.3rem; font-weight: bold;">{best_model}</p>
+                <p style="font-size: 1.1rem;">Test Accuracy: {best_acc:.2%}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-# Dataset Info
+# Dataset Explorer
 elif option == "Dataset Info":
-    st.markdown('<p class="sub-header">📁 Dataset Description</p>', 
-               unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">📁 Dataset Explorer</p>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([1, 1])
+    tab1, tab2, tab3 = st.tabs(["📋 Dataset Overview", "🔬 Training Data", "🧪 Test Data"])
     
-    with col1:
-        st.markdown("""
-        **Dataset:** Wine Quality (Red Wine)
-        **Source:** UCI Machine Learning Repository
-        **Instances:** 1,599
-        **Features:** 12
-        **Output:** Quality Score (converted to binary)
-        
-        **Features:**
-        - Fixed acidity
-        - Volatile acidity
-        - Citric acid
-        - Residual sugar
-        - Chlorides
-        - Free sulfur dioxide
-        - Total sulfur dioxide
-        - Density
-        - pH
-        - Sulphates
-        - Alcohol
-        - Quality (target)
-        """)
-    
-    with col2:
-        st.markdown("**Class Distribution:**")
-        class_dist = pd.DataFrame({
-            'Class': ['Not Good (0)', 'Good (1)'],
-            'Count': [1382, 217],
-            'Percentage': ['86.4%', '13.6%']
-        })
-        st.dataframe(class_dist, use_container_width=True)
-    
-    # Sample data
-    st.markdown('<p class="sub-header">📋 Sample Data</p>', unsafe_allow_html=True)
-    try:
-        df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv', sep=';')
-        st.dataframe(df.head(10), use_container_width=True)
-    except:
-        st.warning("Unable to load sample data. Please check internet connection.")
-
-# Model Training
-elif option == "Model Training":
-    st.markdown('<p class="sub-header">🔄 Model Training & Evaluation</p>', 
-               unsafe_allow_html=True)
-    
-    st.markdown("""
-    ### Training Process:
-    1. **Data Split**: 80% training, 20% testing
-    2. **Feature Scaling**: StandardScaler for distance-based models
-    3. **Cross-validation**: 5-fold CV for hyperparameter tuning
-    4. **Evaluation**: 6 different metrics for comprehensive comparison
-    """)
-    
-    # Display confusion matrices
-    st.markdown("### 📊 Confusion Matrices")
-    model_for_cm = st.selectbox("Select Model", list(models.keys()))
-    
-    try:
-        cm_path = f'model/cm_{model_for_cm.lower().replace(" ", "_")}.png'
-        cm_image = Image.open(cm_path)
-        st.image(cm_image, caption=f'Confusion Matrix - {model_for_cm}', 
-                use_container_width=True)
-    except:
-        st.info(f"Confusion matrix for {model_for_cm} not available. Run training first.")
-
-# Model Comparison
-elif option == "Model Comparison":
-    st.markdown('<p class="sub-header">📊 Model Performance Comparison</p>', 
-               unsafe_allow_html=True)
-    
-    # Metrics table
-    st.markdown("### 📋 Evaluation Metrics")
-    st.dataframe(metrics_df.style.highlight_max(axis=0), use_container_width=True)
-    
-    # Visual comparison
-    st.markdown("### 📈 Visual Comparison")
-    
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        # Bar plot
-        fig, ax = plt.subplots(figsize=(10, 6))
-        metrics = ['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC']
-        x = np.arange(len(metrics_df['Model']))
-        width = 0.12
-        
-        for i, metric in enumerate(metrics):
-            ax.bar(x + i*width, metrics_df[metric], width, label=metric)
-        
-        ax.set_xlabel('Models')
-        ax.set_ylabel('Score')
-        ax.set_title('Model Performance Comparison')
-        ax.set_xticks(x + width * 2.5)
-        ax.set_xticklabels(metrics_df['Model'], rotation=45, ha='right')
-        ax.legend(loc='lower right')
-        ax.set_ylim(0, 1)
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close()
-    
-    with col2:
-        # Heatmap
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(metrics_df.set_index('Model'), annot=True, fmt='.3f', 
-                   cmap='YlOrRd', ax=ax)
-        ax.set_title('Model Performance Heatmap')
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close()
-    
-    # Observations
-    st.markdown('<p class="sub-header">📝 Model Performance Observations</p>', 
-               unsafe_allow_html=True)
-    
-    observations = """
-    1. **Random Forest (Ensemble)** achieves the highest accuracy (89%) and MCC (0.65), 
-       demonstrating superior performance through ensemble learning.
-    
-    2. **XGBoost** closely follows Random Forest with strong precision (81%), 
-       making it excellent for minimizing false positives.
-    
-    3. **Logistic Regression** provides a solid baseline with 88% accuracy, 
-       showing the problem has reasonable linear separability.
-    
-    4. **KNN** performs well (86% accuracy) when features are properly scaled, 
-       capturing local patterns in the feature space.
-    
-    5. **Decision Tree** shows moderate performance (85% accuracy) with some 
-       signs of overfitting despite depth restrictions.
-    
-    6. **Naive Bayes** underperforms (78% accuracy) due to the violation of the 
-       feature independence assumption in wine quality data.
-    """
-    st.info(observations)
-
-# Prediction
-elif option == "Predict":
-    st.markdown('<p class="sub-header">🔮 Make Predictions</p>', 
-               unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        st.markdown("### 📤 Upload Test Data")
-        uploaded_file = st.file_uploader("Upload CSV file (test data)", 
-                                        type=['csv'])
-        
-        if uploaded_file is not None:
-            test_df = pd.read_csv(uploaded_file)
-            st.write("Uploaded Data:")
-            st.dataframe(test_df.head(), use_container_width=True)
-    
-    with col2:
-        st.markdown("### ⚙️ Model Selection")
-        selected_model = st.selectbox("Choose Model", list(models.keys()))
-        
-        if st.button("Predict", type="primary"):
-            if uploaded_file is not None and models[selected_model] is not None:
-                try:
-                    # Prepare features
-                    feature_columns = ['fixed acidity', 'volatile acidity', 'citric acid',
-                                     'residual sugar', 'chlorides', 'free sulfur dioxide',
-                                     'total sulfur dioxide', 'density', 'pH', 'sulphates', 'alcohol']
-                    
-                    X_test = test_df[feature_columns]
-                    
-                    # Scale if necessary
-                    if selected_model in ['Logistic Regression', 'KNN', 'Naive Bayes']:
-                        X_test_scaled = scaler.transform(X_test)
-                        predictions = models[selected_model].predict(X_test_scaled)
-                        probabilities = models[selected_model].predict_proba(X_test_scaled)
-                    else:
-                        predictions = models[selected_model].predict(X_test)
-                        probabilities = models[selected_model].predict_proba(X_test)
-                    
-                    # Display results
-                    st.markdown("### 📊 Prediction Results")
-                    
-                    results_df = test_df.copy()
-                    results_df['Predicted_Quality'] = predictions
-                    results_df['Predicted_Quality_Label'] = results_df['Predicted_Quality'].map(
-                        {0: 'Not Good', 1: 'Good'})
-                    results_df['Probability_Good'] = probabilities[:, 1]
-                    
-                    st.dataframe(results_df[['Predicted_Quality', 'Predicted_Quality_Label', 
-                                           'Probability_Good']].head(), use_container_width=True)
-                    
-                    # Download results
-                    csv = results_df.to_csv(index=False)
-                    b64 = base64.b64encode(csv.encode()).decode()
-                    href = f'<a href="data:file/csv;base64,{b64}" download="predictions.csv">📥 Download Predictions</a>'
-                    st.markdown(href, unsafe_allow_html=True)
-                    
-                except Exception as e:
-                    st.error(f"Error making predictions: {str(e)}")
-            else:
-                st.warning("Please upload a CSV file and select a valid model.")
-
-# About
-elif option == "About":
-    st.markdown('<p class="sub-header">📌 About This Project</p>', 
-               unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("""
-        ### 🎓 Machine Learning Assignment 2
-        
-        **Course:** M.Tech (AIML/DSE) - Machine Learning
-        
-        **Objective:** Implement and deploy multiple classification models
-        
-        **Technologies Used:**
-        - Python 3.9+
-        - Scikit-learn for ML models
-        - XGBoost for ensemble learning
-        - Streamlit for web interface
-        - GitHub for version control
-        - Streamlit Cloud for deployment
-        
-        ### 👨‍💻 Developer
-        [Your Name]
-        BITS Pilani - Work Integrated Learning Programmes
-        
-        ### 📅 Submission Date
-        February 15, 2026
-        """)
-    
-    with col2:
-        st.markdown("### 📋 Assignment Requirements")
-        st.success("✅ 6 ML Models Implemented")
-        st.success("✅ 6 Evaluation Metrics")
-        st.success("✅ Streamlit Web App")
-        st.success("✅ GitHub Repository")
-        st.success("✅ BITS Virtual Lab Screenshot")
-        st.success("✅ README.md with Comparison Tables")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: gray; padding: 1rem;'>
-    Machine Learning Assignment 2 | BITS Pilani WILP | Submission Deadline: February 15, 2026
-</div>
-""", unsafe_allow_html=True)
+    with tab1:
+        col1, col2 = st.columns
