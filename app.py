@@ -344,7 +344,7 @@ if option == "Home":
             for idx, row in top_models.iterrows():
                 medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉"
                 st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+                <div style="background: linear-gradient(135deg, #FFB347 0%, #FF8C00 100%);
                             padding: 1rem; border-radius: 10px; margin-bottom: 0.5rem;
                             border-left: 5px solid {'#FFD700' if idx==0 else '#C0C0C0' if idx==1 else '#CD7F32'};">
                     <h4 style="margin:0;">{medal} {row['Model']}</h4>
@@ -842,6 +842,7 @@ if 'page' in st.session_state:
         option = "Predict"
     elif st.session_state.page == "Model Comparison":
         option = "Model Comparison"
+
 
 
 
