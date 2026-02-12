@@ -348,7 +348,7 @@ if option == "Home":
                             padding: 1rem; border-radius: 10px; margin-bottom: 0.5rem;
                             border-left: 5px solid {'#FFD700' if idx==0 else '#C0C0C0' if idx==1 else '#CD7F32'};">
                     <h4 style="margin:0;">{medal} {row['Model']}</h4>
-                    <p style="font-size: 1.2rem; margin:0; color: #2c3e50;">
+                    <p style="font-size: 1.2rem; margin:0; color: #0A2472;">
                         Accuracy: <b>{row['Test_Accuracy']:.2%}</b>
                     </p>
                 </div>
@@ -842,6 +842,7 @@ if 'page' in st.session_state:
         option = "Predict"
     elif st.session_state.page == "Model Comparison":
         option = "Model Comparison"
+
 
 
 
