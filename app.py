@@ -32,7 +32,7 @@ st.markdown("""
     }
     .sub-header {
         font-size: 1.8rem;
-        color: #965a5e;
+        color: #0A2472;
         margin-top: 1rem;
         margin-bottom: 0.5rem;
         font-weight: 600;
@@ -842,5 +842,6 @@ if 'page' in st.session_state:
         option = "Predict"
     elif st.session_state.page == "Model Comparison":
         option = "Model Comparison"
+
 
 
